@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Love It or Ditch It</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div id="title"></div>
+    <div id="item-container">
+        <div id="item"></div>
+        <div id="description"></div>
+    </div>
+    <button class="side-button left-button" onclick="handleSwipe('delete')">&#x274C;</button>
+    <button class="side-button right-button" onclick="handleSwipe('keep')">&check;</button>
+    <button class="bottom-button" onclick="handleSwipe('watchlist')">&#x2764;</button>
+    <script>
+        function loadItem() {
+            fetch('/item')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('title').innerText = data.title;
+                    document.getElementById('item').innerHTML = `<img src="${data.image_url}" alt="${data.title}" />`;
+                    document.getElementById('description').innerText = data.description;
+                    document.getElementById('item-container').dataset.id = data.key;
+                });
+        }
+
+  	function handleSwipe(direction) {
+    	const itemId = document.getElementById('item-container').dataset.id;
+
+    	// Prepare the data to send in the POST request
+    	const data = {
+      	playlist_name: direction, // Using the swipe direction as the playlist name
+      	rating_key: itemId // The ratingKey from the data-id attribute
+    	};
+
+    	// Make the POST request to the /add-to-playlist route
+    	fetch('/addToPlaylist', {
+      	method: 'POST',
+      	headers: {
+        	'Content-Type': 'application/json',
+      	},
+      		body: JSON.stringify(data),
+    	})
+    	.then(response => {
+      		if (!response.ok) {
+        		throw new Error('Network response was not ok');
+      		}
+      	return response.json();
+   	 })
+    	.then(data => {
+      		console.log(data.message);
+      		// Optionally, load a new item here or provide user feedback
+      		loadItem(); // Assuming you have a function to load a new item
+    	})
+    	.catch((error) => {
+      		console.error('There has been a problem with your fetch operation:', error);
+    	});
+	  }
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+		let touchstartX = 0;
+		let touchendX = 0;
+		let touchstartY = 0;
+		let touchendY = 0;
+			                
+		const itemDiv = document.getElementById('item');
+		function checkSwipe() {
+			// Calculate the absolute difference between start and end X positions
+			var diffX = Math.abs(touchendX - touchstartX);
+			var diffY = Math.abs(touchendY - touchstartY);
+
+			// Calculate 60% of the screen width
+			var thresholdX = window.innerWidth * 0.6;
+
+			// Check if the swipe distance is at least 60% of the screen width
+			if (diffX >= thresholdX) {
+				if (touchendX < touchstartX) {
+					// Swipe left action
+					handleSwipe('keep');
+				} else if (touchendX > touchstartX) {
+			                // Swipe right action
+			                handleSwipe('delete');
+				}
+			} else if (diffX >= thresholdX) {
+				if (touchendY < touchstartY) {
+					handleSwipe('watchlist');
+				} else if (touchendY > touchstartY) {
+			                // Swipe right action
+			                handleSwipe('skip');
+				}
+				
+			}
+		}
+
+
+		itemDiv.addEventListener('touchstart', e => {
+			touchstartX = e.changedTouches[0].screenX;
+			touchstartY = e.changedTouches[0].screenY;
+		});
+
+		itemDiv.addEventListener('touchend', e => {
+			touchendX = e.changedTouches[0].screenX;
+			touchendY = e.changedTouches[0].screenY;
+			checkSwipe();
+		});
+
+		loadItem(); // Initial load
+	});
+    </script>
+</body>
+</html>
+

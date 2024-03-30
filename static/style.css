@@ -1,0 +1,120 @@
+@font-face {
+    font-family: 'F13';
+    src: url('/static/fonts/Friday13SH.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'TallFilm';
+    src: url('/static/fonts/TallFilm.ttf') format('truetype');
+}
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #000; /* Black background color */
+    background-image: url('/static/background.webp'); /* Use the image as a background */
+    background-repeat: repeat; /* Repeat the background in both x and y directions */
+}
+#title {
+    width: 100%;
+    text-align: center;
+    padding: 10px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    font-size: 4rem; /* Set the font size to 18pt */
+    font-family: 'F13', sans-serif; /* Use Arial or a fallback sans-serif font */
+    background-color: black; /* Set background color to white */
+    color: white;
+    text-shadow:
+        -2px -2px 0 #205381,
+         2px -2px 0 #205381,
+        -2px  2px 0 #205381,
+         2px  2px 0 #205381; /* Simulating an outline effect with text shadow */
+}
+
+#item-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Align content to the start */
+    align-items: center;
+    height: 90%;
+    width: 100%;
+    overflow: hidden; /* Prevent overflow */
+}
+#item {
+    max-height: 60%;
+    max-width: 80%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+#item img {
+    max-height: 100%;
+    max-width: 100%;
+    padding: 10px;
+    object-fit: contain;
+}
+#description {
+    max-width: 80%; /* Set maximum width to 80% of its container */
+    background-color: white; /* Set background color to white */
+    border: 2px groove #ccc; /* Apply a beveled border effect with a light gray color */
+    margin: auto; /* Center the description box horizontally */
+    padding: 10px; /* Add some padding inside the box for the text */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    overflow-y: auto; /* Add vertical scroll if content exceeds the element's height */
+    font-size: 3rem;
+    font-family: 'TallFilm', sans-serif;
+}
+.action-button {
+    width: 100px;
+    padding: 10px;
+    margin: 5px;
+}
+
+.side-button {
+    position: fixed; /* Position buttons fixed relative to the viewport */
+    width: 5vw; /* Set width to 5% of the viewport width */
+    height: 5vh; /* Set height to 5% of the viewport height */
+    font-size: 3vw; /* Adjust the arrow size */
+    border: none; /* Optional: remove border */
+    color: white; /* Set the text (arrow) color to white for better visibility */
+    cursor: pointer; /* Change mouse cursor on hover */
+    display: flex; /* Use flexbox for alignment */
+    justify-content: center; /* Center content horizontally */
+    align-items: center; /* Center content vertically */
+    text-align: center; /* Ensure text is centered (if flexbox fails) */
+    padding: 0; /* Remove padding to avoid affecting the centering */
+    border-radius: 0; /* Optional: remove border radius if present */
+    top: 50%; /* Center vertically */
+    transform: translateY(-50%); /* Adjust for exact vertical centering */
+    background-color: rgba(0, 0, 255, 0.5); /* Blue color with 50% opacity */
+}
+.left-button {
+    left: 0; /* Position the left button at the left side of the viewport */
+}
+
+
+.right-button {
+    right: 0; /* Position the right button at the right side of the viewport */
+}
+
+.bottom-button {
+    position: fixed; /* Fixed position relative to the viewport */
+    left: 50%; /* Start at the halfway point of the screen */
+    bottom: 0; /* 20px from the bottom of the viewport */
+    transform: translateX(-50%); /* Shift the button back by half its width to center it */
+    width: 10vw; /* Adjust width as needed */
+    height: 5vh; /* Adjust height as needed */
+    font-size: 2vw; /* Adjust font size as needed */
+    opacity: 0.5; /* Set the opacity to 50% */
+    background-color: rgba(0, 0, 255, 0.5); /* Blue background with 50% opacity */
+    color: white; /* Text color */
+    border: none; /* Optional: remove the border */
+    cursor: pointer; /* Change the cursor on hover */
+}
+
