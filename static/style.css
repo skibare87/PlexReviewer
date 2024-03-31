@@ -19,13 +19,14 @@ body, html {
     background-image: url('/static/background.webp'); /* Use the image as a background */
     background-repeat: repeat; /* Repeat the background in both x and y directions */
 }
+
 #title {
     width: 100%;
     text-align: center;
     padding: 10px;
     box-sizing: border-box;
     flex-shrink: 0;
-    font-size: 4rem; /* Set the font size to 18pt */
+    font-size: 2rem; /* Set the font size to 18pt */
     font-family: 'F13', sans-serif; /* Use Arial or a fallback sans-serif font */
     background-color: black; /* Set background color to white */
     color: white;
@@ -117,4 +118,16 @@ body, html {
     border: none; /* Optional: remove the border */
     cursor: pointer; /* Change the cursor on hover */
 }
+#playlist-link {
+    position: absolute; /* Positions the link absolutely within #title */
+    top: 0; /* Aligns to the top of #title */
+    right: 0; /* Aligns to the right of #title */
+    width: 10%; /* Adjust the width as needed */
+	z-index: 1000;
+}
 
+#playlist-link img {
+    display: block; /* Ensures the img tag takes up the entire space of #playlist-link */
+    width: 100%; /* Makes the image fill its container */
+    height: auto; /* Keeps the image's aspect ratio intact */
+}

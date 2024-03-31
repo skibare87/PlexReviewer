@@ -1,2 +1,3 @@
 #!/bin/bash
 docker build -t hub.pruitt.cloud/tinderplex:latest .
+docker push hub.pruitt.cloud/tinderplex:latest

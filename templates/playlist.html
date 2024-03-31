@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Playlist Contents</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+<script>
+        let isAllSelected = false; // Track whether all checkboxes are selected
+        function selectAllCheckboxes() {
+        isAllSelected = !isAllSelected; // Toggle the state
+        document.querySelectorAll('input[name="selected_items"]').forEach(checkbox => {
+            checkbox.checked = isAllSelected;
+        });
+    }
+
+        function confirmDeletion() {
+    const selectedKeys = Array.from(document.querySelectorAll('input[name="selected_items"]:checked'))
+                              .map(input => input.value); // Gets the keys from the checkboxes
+
+    if (selectedKeys.length > 0 && confirm('Are you sure you want to delete the selected items?')) {
+		document.getElementById('loadingIndicator').style.display = 'block';
+
+        fetch('/delete-items', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ keys: selectedKeys }), // Send keys for deletion
+        })
+        .then(response => response.json())
+        .then(data => {
+            //alert(data.message);
+			document.getElementById('loadingIndicator').style.display = 'none';
+            window.location.reload(); // Reload the page to update the list
+        })
+        .catch(error => console.error('Error:', error));
+		document.getElementById('loadingIndicator').style.display = 'none';
+    }
+}
+    </script>
+</head>
+<body>
+    <h2>Playlist: {{ playlist_name }}</h2>
+	<div id="loadingIndicator" style="display: none;">
+	<img src="{{ url_for('static', filename='images/spinner.gif') }}" alt="Loading...">
+    <p>Deleting items, please wait...</p>
+		<!-- You can also include a graphic spinner here -->
+	</div>
+    <button onclick="selectAllCheckboxes()">Select All</button>
+    <button onclick="confirmDeletion()">Delete</button>
+    
+     <table>
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Name</th>
+                <th>File Paths</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+                <tr>
+                    <td>
+					<input type="checkbox" name="selected_items" value="{{ item.key }}">
+					<input type="hidden" name="item_key_{{ item.key }}" value="{{ item.key }}"></td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.file_paths | join(', ') }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button onclick="selectAllCheckboxes()">Select All</button>
+    <button onclick="confirmDeletion()">Delete</button>
+    
+</body>
+</html>
+

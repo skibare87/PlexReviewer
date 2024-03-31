@@ -2,8 +2,7 @@ from plexapi.server import PlexServer
 from flask import Flask, jsonify, request, render_template
 import random
 import os
-
-
+import shutil
 
 class PlexLibraryCache:
     url=None
@@ -59,7 +58,18 @@ class PlexLibraryCache:
             media_item = self.plex.fetchItem(str(ratingKey_to_add))
             playlist.addItems([media_item])
             print(f"Media item added to the existing playlist '{playlist_name}'.")
-cache=None
+    def deleteMedia(self, key):
+        item = self.plex.fetchItem(str(key))
+        file_paths = [part.file for media in item.media for part in media.parts]
+        if len(file_paths) > 0:
+            try:
+                folder_path = os.path.dirname(file_paths[0])
+                shutil.rmtree(folder_path)
+            except:
+                # Delete files from the filesystem
+                for file_path in file_paths:
+                    os.remove(file_path)     
+        item.delete()
 app = Flask(__name__)
 @app.route('/')
 def index():
@@ -124,10 +134,33 @@ def addToPlaylist():
         # Handle errors (e.g., item or playlist not found)
         print(e)
         return jsonify({'error': str(e)}), 500
+@app.route('/playlist')
+def playlist_contents():
+    playlist_name = request.args.get('name')  # Get the playlist name from the URL query parameter
+    playlist = cache.plex.playlist(playlist_name)
+    items = [{
+        'title': item.title,
+        'key': item.key, 
+        'file_paths': [part.file for media in item.media for part in media.parts]
+    } for item in playlist.items()]
+    return render_template('playlist.html', items=items, playlist_name=playlist_name)
+@app.route('/delete-items', methods=['POST'])
+def delete_items():
+    data = request.json
+    print(str(data))
+    keys = data.get('keys', [])
+    
+    for key in keys:
+        try:
+            cache.deleteMedia(key)
+        except OSError as e:
+            return jsonify({'message': f'Failed to delete file: {file_path}, Error: {str(e)}'}), 500
 
+    return jsonify({'message': 'Selected items deleted successfully'}), 200
 PLEX_URL = os.getenv('PLEX_URL', 'http://localhost:32400')
 PLEX_TOKEN = os.getenv('PLEX_TOKEN', '')
 SECTION = os.getenv('PLEX_SECTION', 'Movies')
+
 
 cache = PlexLibraryCache(PLEX_URL, PLEX_TOKEN)
 cache.loadLibrary(SECTION)

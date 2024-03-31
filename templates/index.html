@@ -10,7 +10,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div id="title"></div>
+    <div id="title">
+    <div id="titleText">Original Title</div> <!-- Container for the title text -->
+    <a href="/playlist?name=delete" id="playlist-link">
+        <img src="{{ url_for('static', filename='images/inspect.png') }}" alt="Go to playlist" style="width: 10%;">
+    </a>
+</div>
+
     <div id="item-container">
         <div id="item"></div>
         <div id="description"></div>
@@ -23,7 +29,7 @@
             fetch('/item')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('title').innerText = data.title;
+                    document.getElementById('titleText').innerText = data.title;
                     document.getElementById('item').innerHTML = `<img src="${data.image_url}" alt="${data.title}" />`;
                     document.getElementById('description').innerText = data.description;
                     document.getElementById('item-container').dataset.id = data.key;
