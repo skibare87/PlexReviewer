@@ -1,0 +1,11 @@
+services:
+  web:
+    image: plexreviewer:latest
+    ports:
+      #Default port mapping for main page
+      - "5000:5000"
+    volumes:
+      #This allows the container to see the same relative path as your plex container
+      - /path/to/media:/plex/path/to/media
+    env_file:
+      - stack.env
