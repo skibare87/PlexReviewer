@@ -44,6 +44,9 @@ class PlexLibraryCache:
         playlist = None
         try:
             playlist = self.plex.playlist(playlist_name)
+            if len(playlist.items()) == 0:
+                playlist.delete()
+                playlist=None
         except Exception as e:
             print(f"Playlist '{playlist_name}' not found. Creating it.")
             playlist = None
@@ -58,9 +61,71 @@ class PlexLibraryCache:
             media_item = self.plex.fetchItem(str(ratingKey_to_add))
             playlist.addItems([media_item])
             print(f"Media item added to the existing playlist '{playlist_name}'.")
+    def getPaths(self, item):
+        # Initialize an empty list to hold all file paths
+        file_paths = []
+
+        #  Check if the item is a movie
+        if item.type == 'movie':
+            file_paths = [part.file for media in item.media for part in media.parts]
+
+        # Check if the item is a TV show
+        elif item.type == 'show':
+            # Iterate through each season of the show
+            for season in item.seasons():
+                # Iterate through each episode in the season
+                for episode in season.episodes():
+                    # Iterate through each part of the episode (there could be multiple files per episode)
+                    file_paths.extend([part.file for media in episode.media for part in media.parts])
+
+        # At this point, file_paths will contain the paths for a movie or all episodes of a TV show
+        return file_paths
+    def findCommonRoot(self,file_paths):
+        if not file_paths:
+            return ""
+
+        # Split each path into components
+        path_components = [path.split(os.sep) for path in file_paths]
+
+        # Zip together all path components to make them easier to compare
+        zipped_components = zip(*path_components)
+
+        common_path_parts = []
+        for component_group in zipped_components:
+            if all(component == component_group[0] for component in component_group):
+                common_path_parts.append(component_group[0])
+            else:
+                break  # Stop at the first non-matching component
+
+        # Join the common components back into a path
+        common_root=os.sep.join(common_path_parts)
+        if os.path.isfile(common_root):
+            parent_directory = os.path.dirname(common_root)
+        else:
+            parent_directory = common_root
+        return parent_directory
+
+    def archiveMedia(self, key, preserve_root):
+        item = self.plex.fetchItem(str(key))
+        file_paths = self.getPaths(item)
+        common_root=self.findCommonRoot(file_paths)
+        if not preserve_root:
+            targetdir=common_root.lstrip(os.sep).replace(os.path.dirname(common_root), "/archive/",1)
+        else:
+            targetdir = os.path.join("/archive", common_root.lstrip(os.sep))
+        try:
+            os.makedirs(os.path.dirname(targetdir), exist_ok=True)
+            print(f'Moving {common_root} to {targetdir}')
+            shutil.move(common_root, os.path.dirname(targetdir))
+            item.delete()
+            return True
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return False
     def deleteMedia(self, key):
         item = self.plex.fetchItem(str(key))
-        file_paths = [part.file for media in item.media for part in media.parts]
+        file_paths = self.getPaths(item)
+
         if len(file_paths) > 0:
             try:
                 folder_path = os.path.dirname(file_paths[0])
@@ -143,24 +208,41 @@ def playlist_contents():
         'key': item.key, 
         'file_paths': [part.file for media in item.media for part in media.parts]
     } for item in playlist.items()]
-    return render_template('playlist.html', items=items, playlist_name=playlist_name)
+    return render_template('playlist.html', items=items, playlist_name=playlist_name, archive_exists=archive_exists)
+@app.route('/archive-items', methods=['POST'])
+def archive_items():
+    data = request.json
+    #print(str(data))
+    keys = data.get('keys', [])
+    
+    for key in keys:
+        try:
+            if cache.archiveMedia(key, PRESERVE_ROOT):
+                return jsonify({'message': 'Selected items archived successfully'}), 200
+            else:
+                return jsonify({'message': f'Failed to archive file: {key}'}), 500
+        except OSError as e:
+            return jsonify({'message': f'Failed to archive file: {key}, Error: {str(e)}'}), 500
+
+    return jsonify({'message': 'Selected items archived successfully'}), 200
 @app.route('/delete-items', methods=['POST'])
 def delete_items():
     data = request.json
-    print(str(data))
+    #print(str(data))
     keys = data.get('keys', [])
     
     for key in keys:
         try:
             cache.deleteMedia(key)
         except OSError as e:
-            return jsonify({'message': f'Failed to delete file: {file_path}, Error: {str(e)}'}), 500
+            return jsonify({'message': f'Failed to delete file: {key}, Error: {str(e)}'}), 500
 
     return jsonify({'message': 'Selected items deleted successfully'}), 200
 PLEX_URL = os.getenv('PLEX_URL', 'http://localhost:32400')
 PLEX_TOKEN = os.getenv('PLEX_TOKEN', '')
 SECTION = os.getenv('PLEX_SECTION', 'Movies')
-
+PRESERVE_ROOT = not os.getenv("PRESERVE_MEDIA_ROOT", "False").lower().startswith('f')
+archive_exists = os.path.exists('/archive')
 
 cache = PlexLibraryCache(PLEX_URL, PLEX_TOKEN)
 cache.loadLibrary(SECTION)
