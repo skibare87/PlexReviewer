@@ -1,5 +1,6 @@
 from plexapi.server import PlexServer
 from flask import Flask, jsonify, request, render_template
+from collections import defaultdict
 import random
 import os
 import shutil
@@ -18,9 +19,11 @@ class PlexLibraryCache:
         self.token=PLEX_TOKEN
         self.plex = PlexServer(PLEX_URL, PLEX_TOKEN)
         print("Connected to Plex server:", self.plex.friendlyName)
+    def getLibraryName(self):
+        return str(self.library_name)
     def loadLibrary(self,LIBRARY_NAME,populate=True):
         # The name of the library from which you want to pick a random item
-        self.library_name = 'Movies'
+        self.library_name = LIBRARY_NAME.lower()
         # Find the library
         self.section = self.plex.library.section(LIBRARY_NAME)
         if populate:
@@ -39,7 +42,7 @@ class PlexLibraryCache:
     def getCoverArt(self,plexitem):
         return self.url + plexitem.thumb + "?X-Plex-Token=" + self.token
     def getStorageLocation(self,plexitem):
-        return [media_part.file for media in plexitem.media for media_part in media.parts]
+        return self.getPaths(plexitem)
     def addToPlaylist(self, playlist_name, ratingKey_to_add):
         playlist = None
         try:
@@ -107,6 +110,8 @@ class PlexLibraryCache:
 
     def archiveMedia(self, key, preserve_root):
         item = self.plex.fetchItem(str(key))
+        if item.TYPE == 'episode':
+            item=item.show()
         file_paths = self.getPaths(item)
         common_root=self.findCommonRoot(file_paths)
         if not preserve_root:
@@ -124,16 +129,30 @@ class PlexLibraryCache:
             return False
     def deleteMedia(self, key):
         item = self.plex.fetchItem(str(key))
+        if item.TYPE == 'episode':
+            item=item.show()
         file_paths = self.getPaths(item)
 
         if len(file_paths) > 0:
             try:
                 folder_path = os.path.dirname(file_paths[0])
                 shutil.rmtree(folder_path)
+                while os.path.exists(os.path.dirname(folder_path)) and len(os.listdir(os.path.dirname(folder_path))) == 0:
+                    parent_folder = os.path.dirname(folder_path)
+                    # Break if parent_folder is the same as folder_path to prevent infinite loop
+                    if parent_folder == folder_path or not os.path.exists(parent_folder):
+                        break
+                    # If the parent is empty, remove it
+                    if len(os.listdir(parent_folder)) == 0:
+                        shutil.rmtree(parent_folder)
+                        folder_path = parent_folder
+                    else:
+                        break
             except:
                 # Delete files from the filesystem
                 for file_path in file_paths:
-                    os.remove(file_path)     
+                    if os.path.exists(file_path):
+                        os.remove(file_path)     
         item.delete()
 app = Flask(__name__)
 @app.route('/')
@@ -184,7 +203,7 @@ def addToPlaylist():
     data = request.json
 
     # Extract playlist name and rating key from the data
-    playlist_name = data.get('playlist_name')
+    playlist_name = data.get('playlist_name')+"_"+cache.getLibraryName()
     rating_key_to_add = data.get('rating_key')
 
     # Ensure both playlist name and rating key are provided
@@ -201,13 +220,50 @@ def addToPlaylist():
         return jsonify({'error': str(e)}), 500
 @app.route('/playlist')
 def playlist_contents():
-    playlist_name = request.args.get('name')  # Get the playlist name from the URL query parameter
-    playlist = cache.plex.playlist(playlist_name)
-    items = [{
-        'title': item.title,
-        'key': item.key, 
-        'file_paths': [part.file for media in item.media for part in media.parts]
-    } for item in playlist.items()]
+    playlist_name = request.args.get('name')+"_"+cache.getLibraryName()  # Get the playlist name from the URL query parameter
+    try:
+        playlist = cache.plex.playlist(playlist_name)
+        
+
+        # Step 1: Initialize a dictionary to aggregate episodes by their shows
+        shows = defaultdict(lambda: {"title": None, "key": None, "file_paths": set()})
+
+        # Step 2: Iterate through the playlist items and aggregate
+        for item in playlist.items():
+            if item.TYPE == 'episode':
+                # Assuming 'show()' method fetches the show object for the episode
+                show = item.show()
+            else:
+                show=item
+            show_title = show.title
+            show_key = show.key
+            
+            shows[show_key]["title"] = show_title  # Update the title (redundant after the first episode of each show)
+            shows[show_key]["key"] = show_key  # Update the show key (redundant after the first episode of each show)
+            # Aggregate file paths; convert to list if you prefer, but sets avoid duplicates
+            shows[show_key]["file_paths"].update(
+                part.file for media in item.media for part in media.parts
+            )
+        # Step 3: Convert the aggregation to a list
+        items = [
+            {
+                "title": data["title"],
+                "key": show_key,
+                # Convert the set of file paths to a list, if necessary
+                "file_paths": [cache.findCommonRoot(list(data["file_paths"]))]
+            }
+            for show_key, data in shows.items()
+        ]
+
+        # items = [{
+            # 'title': item.grandparentTitle + ": " + item.title if item.TYPE == 'episode' else item.title,
+            # 'key': item.key, 
+            # 'file_paths': [part.file for media in item.media for part in media.parts]
+        # } for item in playlist.items()]
+    except Exception as e:
+        print(e)
+        items=[]
+    
     return render_template('playlist.html', items=items, playlist_name=playlist_name, archive_exists=archive_exists)
 @app.route('/archive-items', methods=['POST'])
 def archive_items():
@@ -242,7 +298,20 @@ PLEX_URL = os.getenv('PLEX_URL', 'http://localhost:32400')
 PLEX_TOKEN = os.getenv('PLEX_TOKEN', '')
 SECTION = os.getenv('PLEX_SECTION', 'Movies')
 PRESERVE_ROOT = not os.getenv("PRESERVE_MEDIA_ROOT", "False").lower().startswith('f')
-archive_exists = os.path.exists('/archive')
+if os.path.exists('/archive'):
+    archive_exists=True
+elif "ARCHIVE_FOLDER" in os.environ and os.path.isdir(os.environ["ARCHIVE_FOLDER"]):
+    try:
+        os.symlink(os.environ["ARCHIVE_FOLDER"], "/archive")
+        if os.path.exists('/archive'):
+            archive_exists=True
+        else:
+            archive_exists=False
+            print("Failed to link Archive Folder")
+    except OSError as e:
+        print(f"Failed to create symlink: {e}")
+else:
+    archive_exists=False
 
 cache = PlexLibraryCache(PLEX_URL, PLEX_TOKEN)
 cache.loadLibrary(SECTION)
